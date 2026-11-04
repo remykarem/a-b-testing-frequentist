@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>A/B Test Simulator</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+  <style>:root {
+  --accent: #7b3fc4;
+  --bg: #fdfdfb;
+  --fg: #1d1d1b;
+  --muted: #6b6b66;
+  --line: #dcdcd6;
+  --a: #2f6fb5;
+  --b: #d9822b;
+  --err: #b3261e;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --accent: #b794f4;
+    --bg: #17171a;
+    --fg: #e8e8e4;
+    --muted: #9a9a94;
+    --line: #34343a;
+    --a: #6aa6e8;
+    --b: #f0a459;
+    --err: #ff8a80;
+  }
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 16px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+}
+main { max-width: 640px; margin: 0 auto; padding: 24px 16px 80px; }
+h1 { font-size: 1.6rem; margin-bottom: 0.2em; }
+h2 { font-size: 1.25rem; margin: 2em 0 0.5em; border-bottom: 1px solid var(--line); padding-bottom: 0.2em; }
+h3 { font-size: 1.05rem; margin: 1.6em 0 0.4em; }
+h4 { font-size: 0.95rem; margin: 0 0 0.2em; }
+.lede, .note { color: var(--muted); }
+.note { font-size: 0.875rem; margin: 0.3em 0; }
+.error { color: var(--err); margin: 0; }
+
+input, select, button {
+  font: inherit;
+  color: var(--fg);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 2px 6px;
+}
+input[type="radio"] { margin-right: 4px; }
+label { margin-right: 12px; white-space: nowrap; }
+button { padding: 6px 14px; cursor: pointer; background: var(--fg); color: var(--bg); border-color: var(--fg); }
+button:hover { opacity: 0.85; }
+:focus-visible { outline: 2px solid var(--a); outline-offset: 2px; }
+
+figure { margin: 1.5em 0; }
+figcaption { font-weight: 600; }
+svg { width: 100%; height: auto; display: block; }
+.swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; }
+.swatch.a, .bar.a { fill: var(--a); background: var(--a); }
+.swatch.b, .bar.b { fill: var(--b); background: var(--b); }
+.bar { opacity: 0.85; }
+.grid { stroke: var(--line); stroke-width: 1; }
+.axis { stroke: var(--muted); stroke-width: 1; }
+.expected { stroke: var(--fg); stroke-width: 2; }
+.curve { fill: none; stroke: var(--fg); stroke-width: 2; }
+.observed { stroke: var(--fg); stroke-width: 1.5; stroke-dasharray: 4 3; }
+.tick { fill: var(--muted); font-size: 11px; }
+.axis-title { fill: var(--muted); font-size: 12px; }
+
+.step { margin: 1em 0; padding-left: 12px; border-left: 3px solid var(--line); }
+.tex .katex-display { margin: 0.4em 0; overflow-x: auto; overflow-y: hidden; }
+.headline { font-weight: 700; margin-bottom: 0.2em; }
+
+.bar.d { fill: var(--muted); }
+.curve.null { stroke-dasharray: 6 4; }
+.reject { fill: var(--err); opacity: 0.14; }
+.obs { stroke: var(--accent); stroke-width: 2; }
+.obs-label { fill: var(--accent); font-size: 12px; font-weight: 600; }
+.legend .key { display: inline-block; width: 18px; height: 0; border-top: 2px solid var(--fg); vertical-align: middle; margin: 0 4px 0 12px; }
+.legend .key:first-child { margin-left: 0; }
+.legend .key.hist { height: 10px; border: 0; background: var(--muted); }
+.legend .key.dashed { border-top-style: dashed; }
+.legend .key.reject { height: 10px; border: 0; background: var(--err); opacity: 0.3; }
+.legend .key.obs { border-top-color: var(--accent); }
+.pval-area { fill: var(--accent); opacity: 0.5; }
+.reject-area { fill: var(--err); opacity: 0.18; }
+.crit { stroke: var(--err); stroke-width: 1.5; stroke-dasharray: 4 3; }
+.legend .key.pval { height: 10px; border: 0; background: var(--accent); opacity: 0.6; }
+.legend .key.crit { border-top-color: var(--err); border-top-style: dashed; }
+.ci { stroke: var(--fg); stroke-width: 3; }
+.ci-arrow { fill: var(--fg); }
+.ci-label { fill: var(--fg); font-size: 11px; paint-order: stroke; stroke: var(--bg); stroke-width: 3px; }
+.legend .key.ci { border-top-width: 4px; }
+textarea { font: inherit; color: var(--fg); background: transparent; border: 1px solid var(--line); border-radius: 4px; padding: 6px; width: 100%; box-sizing: border-box; }
+</style>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+  <script type="module">(()=>{function V(t){let e=t|0;return()=>{e=e+1831565813|0;let n=Math.imul(e^e>>>15,1|e);return n=n+Math.imul(n^n>>>7,61|n)^n,((n^n>>>14)>>>0)/4294967296}}var L=t=>t.reduce((e,n)=>e+n,0),P=t=>L(t)/t.length,j=t=>{let e=P(t);return t.reduce((n,s)=>n+(s-e)**2,0)/(t.length-1)},D=t=>t.reduce((e,n)=>n>e?n:e,-1/0);function qt(t){let e=t.length,n=t.map((i,c)=>c).sort((i,c)=>t[i]-t[c]),s=new Array(e),a=0,o=0;for(;o<e;){let i=o;for(;i+1<e&&t[n[i+1]]===t[n[o]];)i++;let c=(o+i)/2+1;for(let d=o;d<=i;d++)s[n[d]]=c;let m=i-o+1;a+=m**3-m,o=i+1}return{ranks:s,tieSum:a}}var wt=[.9999999999998099,676.5203681218851,-1259.1392167224028,771.3234287776531,-176.6150291621406,12.507343278686905,-.13857109526572012,9984369578019572e-21,15056327351493116e-23];function H(t){if(t<.5)return Math.log(Math.PI/Math.sin(Math.PI*t))-H(1-t);t-=1;let e=wt[0];for(let s=1;s<9;s++)e+=wt[s]/(t+s);let n=t+7.5;return .5*Math.log(2*Math.PI)+(t+.5)*Math.log(n)-n+Math.log(e)}var ut=1e-15,k=1e-300;function Xt(t,e){let n=t,s=1/t,a=s;for(let o=0;o<500&&(n++,a*=e/n,s+=a,!(Math.abs(a)<Math.abs(s)*ut));o++);return s*Math.exp(-e+t*Math.log(e)-H(t))}function Wt(t,e){let n=e+1-t,s=1/k,a=1/n,o=a;for(let i=1;i<500;i++){let c=-i*(i-t);n+=2,a=c*a+n,Math.abs(a)<k&&(a=k),s=n+c/s,Math.abs(s)<k&&(s=k),a=1/a;let m=a*s;if(o*=m,Math.abs(m-1)<ut)break}return Math.exp(-e+t*Math.log(e)-H(t))*o}function Kt(t,e){return e<=0?1:e<t+1?1-Xt(t,e):Wt(t,e)}function Z(t){let e=Kt(.5,t*t/2);return t>=0?.5*e:1-.5*e}var X=t=>Z(-t);function At(t,e,n){let s=t+e,a=t+1,o=t-1,i=1,c=1-s*n/a;Math.abs(c)<k&&(c=k),c=1/c;let m=c;for(let d=1;d<=500;d++){let h=2*d,l=d*(e-d)*n/((o+h)*(t+h));c=1+l*c,Math.abs(c)<k&&(c=k),i=1+l/i,Math.abs(i)<k&&(i=k),c=1/c,m*=c*i,l=-(t+d)*(s+d)*n/((t+h)*(a+h)),c=1+l*c,Math.abs(c)<k&&(c=k),i=1+l/i,Math.abs(i)<k&&(i=k),c=1/c;let p=c*i;if(m*=p,Math.abs(p-1)<ut)break}return m}function Gt(t,e,n){if(t<=0)return 0;if(t>=1)return 1;let s=Math.exp(H(e+n)-H(e)-H(n)+e*Math.log(t)+n*Math.log(1-t));return t<(e+1)/(e+n+2)?s*At(e,n,t)/e:1-s*At(n,e,1-t)/n}var ft=t=>Math.exp(-(t*t)/2)/Math.sqrt(2*Math.PI),Et=(t,e)=>Math.exp(H((e+1)/2)-H(e/2)-.5*Math.log(e*Math.PI)-(e+1)/2*Math.log(1+t*t/e));function Y(t,e){let n=.5*Gt(e/(e+t*t),e/2,.5);return t>=0?n:1-n}function St(t,e){let n=0,s=1;for(;t(s)>e;)s*=2;for(let a=0;a<200;a++){let o=(n+s)/2;t(o)>e?n=o:s=o}return(n+s)/2}var W=t=>St(Z,t),Q=(t,e)=>St(n=>Y(n,e),t);function Vt(t,e){let n=0,s=t;for(;s>0;){let a=Math.min(s,30);s-=a;let o=Math.exp(-a),i=0,c=e();for(;c>o;)i++,c*=e();n+=i}return n}var U={bernoulli:{name:"Bernoulli",param:"p",paramHint:"probability of success, 0 to 1",defaults:[.3,.6],valid:t=>t>=0&&t<=1,sample:(t,e)=>e()<t?1:0,mean:t=>t,variance:t=>t*(1-t),tex:{param:"p",mean:"p",variance:"p(1-p)"},validValue:t=>t===0||t===1,valueHint:"each value must be 0 or 1",exampleObs:[[0,1,0,0,1,0,0,1,0,0,1,0,1,0,0,0,1,0,0,1],[1,1,0,1,0,1,1,0,1,1,0,1,1,1,0,1,0,1,1,0]],discrete:!0,pmf:(t,e)=>t===1?e:t===0?1-e:0},poisson:{name:"Poisson",param:"\u03BB",paramHint:"mean count, above 0",defaults:[4,5],valid:t=>t>0,sample:Vt,mean:t=>t,variance:t=>t,tex:{param:"\\lambda",mean:"\\lambda",variance:"\\lambda"},validValue:t=>Number.isInteger(t)&&t>=0,valueHint:"non-negative whole numbers",exampleObs:[[3,5,2,4,6,3,4,7,2,4,5,3,4,1,6,4,3,5,4,2],[5,7,4,6,8,5,3,6,5,7,4,6,5,9,5,4,6,7,5,6]],discrete:!0,pmf:(t,e)=>Math.exp(t*Math.log(e)-e-H(t+1))},exponential:{name:"Exponential",param:"\u03BB",paramHint:"rate, above 0 (mean is 1/\u03BB)",defaults:[1,.8],valid:t=>t>0,sample:(t,e)=>-Math.log(1-e())/t,mean:t=>1/t,variance:t=>1/t**2,tex:{param:"\\lambda",mean:"1/\\lambda",variance:"1/\\lambda^2"},validValue:t=>t>=0,valueHint:"non-negative numbers",exampleObs:[[.42,1.35,.08,2.1,.73,.31,1.66,.95,.19,3.02,.57,1.18,.26,.88,1.94,.12,.64,1.41,.37,.79],[.55,1.92,.27,3.4,1.05,.48,2.31,.83,1.67,.15,2.74,1.28,.62,4.05,.97,1.51,.34,2.08,.71,1.22]],discrete:!1,cdf:(t,e)=>1-Math.exp(-e*t)}};var r=(t,e=4)=>{if(!isFinite(t))return t>0?"\\infty":t<0?"-\\infty":"\\text{NaN}";if(t!==0&&Math.abs(t)<1e-4){let[n,s]=t.toExponential(e-1).split("e");return`${n}\\times10^{${+s}}`}return String(+t.toPrecision(e))},st=t=>`${+((1-t)*100).toFixed(4)}%`,Ct=(t,e,n,s)=>{let a=t-e,o=s==="two"?t+e:1/0;return{dLo:a,dHi:o,lo:a/n,hi:o/n}};function Nt(t,e){let n=`${t}_A`,s=`${t}_B`;return e==="two"?{h0:`${n} = ${s}`,h1:`${n} \\neq ${s}`}:{h0:`${s} \\le ${n}`,h1:`${s} > ${n}`}}function ht(t,e){let n=t<=e;return{title:"Decision",lines:[`p = ${r(t)} ${n?"\\le":">"} \\alpha = ${r(e)}`],note:n?"p \u2264 \u03B1, so reject H\u2080.":"p > \u03B1, so fail to reject H\u2080."}}function pt(t,e,n){return{hypotheses:t,steps:[...e,{title:"Cannot compute",lines:[],note:n}],p:NaN,reject:!1,degenerate:!0}}function Yt(t,e,{alpha:n,tails:s}){let a=t.length,o=e.length,i=P(t),c=P(e),m=j(t),d=j(e),h=Nt("\\mu",s),l=c-i,p=m/a,x=d/o,f=Math.sqrt(p+x),b=[{title:"Sample summaries",lines:[`\\bar x_A = ${r(i)},\\quad s_A^2 = ${r(m)},\\quad n_A = ${a}`,`\\bar x_B = ${r(c)},\\quad s_B^2 = ${r(d)},\\quad n_B = ${o}`]},{title:"Observed difference",lines:[`\\delta = \\bar x_B - \\bar x_A = ${r(c)} - ${r(i)} = ${r(l)}`]}];if(!(f>0))return pt(h,b,"Both samples have zero variance, so the standard error is 0.");let $=(p+x)**2/(p**2/(a-1)+x**2/(o-1)),g=l/f,E=s==="two"?2*Y(Math.abs(g),$):Y(g,$);if(b.push({title:"Standard error",lines:[`SE = \\sqrt{\\dfrac{s_A^2}{n_A} + \\dfrac{s_B^2}{n_B}} = \\sqrt{\\dfrac{${r(m)}}{${a}} + \\dfrac{${r(d)}}{${o}}} = ${r(f)}`]},{title:"Test statistic",lines:[`t = \\dfrac{\\delta}{SE} = \\dfrac{${r(l)}}{${r(f)}} = ${r(g)}`]},{title:"Degrees of freedom (Welch\u2013Satterthwaite)",lines:[`\\nu = \\dfrac{\\left(\\frac{s_A^2}{n_A} + \\frac{s_B^2}{n_B}\\right)^2}{\\frac{(s_A^2/n_A)^2}{n_A-1} + \\frac{(s_B^2/n_B)^2}{n_B-1}} = ${r($)}`]},{title:"p-value",lines:s==="two"?[`p = 2\\,P(T_{\\nu} \\ge |t|) = 2\\,P(T_{${r($,3)}} \\ge ${r(Math.abs(g))}) = ${r(E)}`]:[`p = P(T_{\\nu} \\ge t) = P(T_{${r($,3)}} \\ge ${r(g)}) = ${r(E)}`]}),s==="two"){let y=Q(n/2,$);b.push({title:`${st(n)} confidence interval for the difference`,lines:[`\\delta \\pm t_{\\alpha/2,\\nu}\\,SE = ${r(l)} \\pm ${r(y)}\\times${r(f)} = [${r(l-y*f)},\\ ${r(l+y*f)}]`]})}else{let y=Q(n,$);b.push({title:`${st(n)} one-sided confidence bound`,lines:[`\\delta - t_{\\alpha,\\nu}\\,SE = ${r(l)} - ${r(y)}\\times${r(f)} \\Rightarrow [${r(l-y*f)},\\ \\infty)`]})}b.push(ht(E,n));let v={d:l,se:f,stat:g,sym:"t",ref:`t_{${r($,3)}}`,crit:s==="two"?Q(n/2,$):Q(n,$),cdf:y=>1-Y(y,$)},w={sym:"t",stat:g,ref:v.ref,crit:v.crit,pdf:y=>Et(y,$),ci:Ct(l,v.crit*f,f,s)};return{hypotheses:h,steps:b,p:E,reject:E<=n,diff:v,statDist:w}}function Qt(t,e,{alpha:n,tails:s}){let a=t.length,o=e.length,i=L(t),c=L(e),m=i/a,d=c/o,h=Nt("p",s),l=d-m,p=(i+c)/(a+o),x=Math.sqrt(p*(1-p)*(1/a+1/o)),f=[{title:"Sample proportions",lines:[`\\hat p_A = \\dfrac{x_A}{n_A} = \\dfrac{${i}}{${a}} = ${r(m)}`,`\\hat p_B = \\dfrac{x_B}{n_B} = \\dfrac{${c}}{${o}} = ${r(d)}`,`\\delta = \\hat p_B - \\hat p_A = ${r(l)}`]},{title:"Pooled proportion (assumes H\u2080 is true)",lines:[`\\hat p = \\dfrac{x_A + x_B}{n_A + n_B} = \\dfrac{${i+c}}{${a+o}} = ${r(p)}`]}];if(!(x>0))return pt(h,f,"Every observation is identical, so the pooled standard error is 0.");let b=l/x,$=s==="two"?2*Z(Math.abs(b)):Z(b),g=Math.sqrt(m*(1-m)/a+d*(1-d)/o),E=Math.min(a*p,a*(1-p),o*p,o*(1-p))<5;f.push({title:"Pooled standard error under H\u2080",lines:[`\\begin{align} SE &= \\sqrt{\\dfrac{\\hat p(1-\\hat p)}{n_A} + \\dfrac{\\hat p(1-\\hat p)}{n_B}} \\\\ 
+        &= \\sqrt{\\hat p(1-\\hat p)\\left(\\dfrac{1}{n_A} + \\dfrac{1}{n_B}\\right)} \\\\
+          &= \\sqrt{${r(p)}\\times${r(1-p)}\\times\\left(\\dfrac{1}{${a}} + \\dfrac{1}{${o}}\\right)} \\\\
+        &= ${r(x)}
+        \\end{align}
+        `],note:E?"Warning: an expected count is below 5, so the normal approximation may be poor.":void 0},{title:"Unpooled standard error",lines:[`SE_{CI} = \\sqrt{\\dfrac{\\hat p_A(1-\\hat p_A)}{n_A} + \\dfrac{\\hat p_B(1-\\hat p_B)}{n_B}} = ${r(g)}`]},{title:"Test statistic",lines:[`z = \\dfrac{\\delta}{SE} = \\dfrac{${r(l)}}{${r(x)}} = ${r(b)}`]},{title:"p-value",lines:s==="two"?[`p = 2\\,P(Z \\ge |z|) = 2\\,P(Z \\ge ${r(Math.abs(b))}) = ${r($)}`]:[`p = P(Z \\ge z) = P(Z \\ge ${r(b)}) = ${r($)}`]});let v=`SE_{CI} = \\sqrt{\\dfrac{\\hat p_A(1-\\hat p_A)}{n_A} + \\dfrac{\\hat p_B(1-\\hat p_B)}{n_B}} = ${r(g)}`;if(s==="two"){let q=W(n/2);f.push({title:`${st(n)} confidence interval for the difference`,lines:[`\\delta \\pm z_{\\alpha/2}\\,SE_{CI} = ${r(l)} \\pm ${r(q)}\\times${r(g)} = [${r(l-q*g)},\\ ${r(l+q*g)}]`],note:"The interval uses the unpooled standard error, since it makes no assumption that H\u2080 holds."})}else{let q=W(n);f.push({title:`${st(n)} one-sided confidence bound`,lines:[v,`\\delta - z_{\\alpha}\\,SE_{CI} = ${r(l)} - ${r(q)}\\times${r(g)} \\Rightarrow [${r(l-q*g)},\\ \\infty)`]})}f.push(ht($,n));let w={d:l,se:x,stat:b,sym:"z",ref:"N(0,1)",crit:s==="two"?W(n/2):W(n),cdf:X},y={sym:"z",stat:b,ref:w.ref,crit:w.crit,pdf:ft,ci:Ct(l,w.crit*g,x,s)};return{hypotheses:h,steps:f,p:$,reject:$<=n,diff:w,statDist:y}}function Jt(t,e,{alpha:n,tails:s}){let a=t.length,o=e.length,i=a+o,c=s==="two"?{h0:"F_A = F_B",h1:"F_A \\neq F_B"}:{h0:"\\text{B is not stochastically larger than A}",h1:"P(B > A) > P(A > B)"},{ranks:m,tieSum:d}=qt([...t,...e]),h=L(m.slice(0,a)),l=L(m.slice(a)),p=l-o*(o+1)/2,x=a*o/2,f=a*o/12*(i+1-d/(i*(i-1))),b=Math.sqrt(f),$=[{title:"Rank all observations together",lines:[`R_A = ${r(h)},\\quad R_B = ${r(l)}\\qquad (R_A + R_B = N(N+1)/2 = ${i*(i+1)/2})`],note:"Tied values receive the average of the ranks they span."},{title:"U statistic for B",lines:[`U_B = R_B - \\dfrac{n_B(n_B+1)}{2} = ${r(l)} - ${o*(o+1)/2} = ${r(p)}`,`\\dfrac{U_B}{n_A n_B} = ${r(p/(a*o))} \\quad\\text{(estimate of } P(B>A) + \\tfrac12 P(B=A)\\text{)}`]}];if(!(b>0))return pt(c,$,"Every observation is tied, so the variance of U is 0.");let g=p-x,E=s==="two"?.5*Math.sign(g):.5,v=(g-E)/b,w=s==="two"?Math.min(1,2*Z(Math.abs(v))):Z(v);$.push({title:"Mean and standard deviation of U under H\u2080",lines:[`\\mu_U = \\dfrac{n_A n_B}{2} = ${r(x)}`,`\\sigma_U^2 = \\dfrac{n_A n_B}{12}\\left(N+1 - \\dfrac{\\sum(t^3-t)}{N(N-1)}\\right) = \\dfrac{${a}\\times${o}}{12}\\left(${i+1} - \\dfrac{${d}}{${i*(i-1)}}\\right) = ${r(f)}`,`\\sigma_U = ${r(b)}`],note:"The sum runs over groups of tied values, where t is the group size."},{title:"Test statistic (with continuity correction)",lines:[s==="two"?`z = \\dfrac{U_B - \\mu_U - \\tfrac12\\operatorname{sign}(U_B - \\mu_U)}{\\sigma_U} = \\dfrac{${r(p)} - ${r(x)} - ${r(E)}}{${r(b)}} = ${r(v)}`:`z = \\dfrac{U_B - \\mu_U - \\tfrac12}{\\sigma_U} = \\dfrac{${r(p)} - ${r(x)} - 0.5}{${r(b)}} = ${r(v)}`]},{title:"p-value",lines:s==="two"?[`p = 2\\,P(Z \\ge |z|) = 2\\,P(Z \\ge ${r(Math.abs(v))}) = ${r(w)}`]:[`p = P(Z \\ge z) = P(Z \\ge ${r(v)}) = ${r(w)}`]},ht(w,n));let y={sym:"z",stat:v,ref:"N(0,1)",crit:s==="two"?W(n/2):W(n),pdf:ft};return{hypotheses:c,steps:$,p:w,reject:w<=n,statDist:y}}var J={ztest:{name:"Two-proportion z-test",applies:t=>t==="bernoulli",run:Qt},welch:{name:"Welch's t-test",applies:()=>!0,run:Yt},mannwhitney:{name:"Mann\u2013Whitney U test",applies:()=>!0,run:Jt}},Pt=t=>Object.keys(J).filter(e=>J[e].applies(t));function kt(t,{alpha:e,tails:n,trueMeanA:s,trueMeanB:a}){let o=n==="two"?"the two groups differ":"B is greater than A",i,c;if(t.degenerate?(i="The test could not be computed.",c="See the last step above for why."):t.reject?(i="Reject the null hypothesis.",c=`At \u03B1 = ${e}, p = ${+t.p.toPrecision(3)} \u2264 \u03B1, so there is statistically significant evidence that ${o}.`):(i="Fail to reject the null hypothesis.",c=`At \u03B1 = ${e}, p = ${+t.p.toPrecision(3)} > \u03B1, so the data do not provide statistically significant evidence that ${o}. This is not proof that they are equal: the test may lack power at these sample sizes.`),s==null)return{headline:i,detail:c,truth:""};let m=n==="two"?s!==a:a>s,d;t.degenerate?d="":t.reject?d=m?"The test made the right call (true positive).":"This is a Type I error (false positive): H\u2080 is actually true.":d=m?"This is a Type II error (missed a real effect).":"The test made the right call (true negative).";let h=`Ground truth, known because the data is simulated: true mean of A = ${+s.toPrecision(4)}, true mean of B = ${+a.toPrecision(4)}. ${d}`;return{headline:i,detail:c,truth:h}}var te="http://www.w3.org/2000/svg",K=520,tt=260,_={l:52,r:12,t:12,b:42},I=K-_.l-_.r,T=tt-_.t-_.b,$t=30;function B(t,e,n,s){let a=document.createElementNS(te,t);for(let o in e)a.setAttribute(o,e[o]);return s!==void 0&&(a.textContent=s),n&&n.appendChild(a),a}var ot=t=>{let e=t>.4?.1:t>.15?.05:t>.06?.02:.01;return Math.ceil(t*1.05/e)*e},z=t=>String(+t.toPrecision(3));function Tt(t,e,n){let s=D(e.map(D)),a,o,i;if(t.discrete)a=Array.from({length:s+1},(d,h)=>({x0:h,x1:h+1})),o=d=>d,i=(d,h)=>t.pmf(d.x0,h);else{let d=s/$t;a=Array.from({length:$t},(h,l)=>({x0:l*d,x1:(l+1)*d})),o=h=>Math.min($t-1,Math.floor(h/d)),i=(h,l)=>t.cdf(h.x1,l)-t.cdf(h.x0,l)}let c=e.map((d,h)=>{let l=new Array(a.length).fill(0);for(let p of d)l[o(p)]++;return{freq:l.map(p=>p/d.length),expected:n?a.map(p=>i(p,n[h])):null}}),m=ot(D(c.flatMap(d=>[...d.freq,...d.expected??[]])));return{discrete:t.discrete,bins:a,panels:c,ymax:m}}function at(t,e,n="relative frequency"){t.replaceChildren(),t.setAttribute("viewBox",`0 0 ${K} ${tt}`);let s=a=>_.t+T-a/e*T;for(let a=0;a<=4;a++){let o=e*a/4;B("line",{x1:_.l,x2:K-_.r,y1:s(o),y2:s(o),class:"grid"},t),B("text",{x:_.l-6,y:s(o)+4,class:"tick","text-anchor":"end"},t,o.toFixed(2))}return B("text",{transform:`translate(12 ${_.t+T/2}) rotate(-90)`,class:"axis-title","text-anchor":"middle"},t,n),s}function xt(t,e,n,s){let{bins:a,discrete:o,ymax:i}=e,{freq:c,expected:m}=e.panels[n],d=at(t,i),h=a.length,l=I/h,p=o?Math.min(4,l*.2):1;if(o){let f=Math.ceil(h/12);a.forEach((b,$)=>{$%f===0&&B("text",{x:_.l+($+.5)*l,y:_.t+T+16,class:"tick","text-anchor":"middle"},t,b.x0)})}else for(let f=0;f<=h;f+=h/5){let b=a[Math.min(f,h-1)],$=f===h?a[h-1].x1:b.x0;B("text",{x:_.l+f*l,y:_.t+T+16,class:"tick","text-anchor":"middle"},t,z($))}B("text",{x:_.l+I/2,y:tt-6,class:"axis-title","text-anchor":"middle"},t,"value");let x=a.map((f,b)=>B("rect",{x:_.l+b*l+p/2,width:Math.max(.5,l-p),y:d(0),height:0,class:`bar ${s}`},t));return(m??[]).forEach((f,b)=>{B("line",{x1:_.l+b*l+p/2,x2:_.l+(b+1)*l-p/2,y1:d(f),y2:d(f),class:"expected"},t)}),B("line",{x1:_.l,x2:K-_.r,y1:d(0),y2:d(0),class:"axis"},t),f=>{c.forEach((b,$)=>{let g=b*f/i*T;x[$].setAttribute("y",_.t+T-g),x[$].setAttribute("height",g)})}}function It(t,{means:e,mu:n,se:s,observed:a},o){let c=s>0?s:.1,m=n-4*c,d=8*c/40,h=v=>m+v*d,l=new Array(40).fill(0);for(let v of e){let w=Math.floor((v-m)/d);w>=0&&w<40&&l[w]++}let p=l.map(v=>v/e.length),x=p.map((v,w)=>s>0?X((h(w+1)-n)/c)-X((h(w)-n)/c):0),f=ot(D([...p,...x])),b=at(t,f),$=I/40,g=v=>_.l+(v-m)/(8*c)*I;for(let v=0;v<=4;v++)B("text",{x:_.l+v*I/4,y:_.t+T+16,class:"tick","text-anchor":"middle"},t,z(m+v*8*c/4));B("text",{x:_.l+I/2,y:tt-6,class:"axis-title","text-anchor":"middle"},t,"sample mean");let E=p.map((v,w)=>B("rect",{x:_.l+w*$+.5,width:$-1,y:b(0),height:0,class:`bar ${o}`},t));if(s>0){let v=x.map((w,y)=>`${y?"L":"M"}${_.l+(y+.5)*$},${b(w)}`).join(" ");B("path",{d:v,class:"curve"},t)}return a>=m&&a<=m+8*c&&B("line",{x1:g(a),x2:g(a),y1:_.t,y2:_.t+T,class:"observed"},t),B("line",{x1:_.l,x2:K-_.r,y1:b(0),y2:b(0),class:"axis"},t),v=>{p.forEach((w,y)=>{let q=w*v/f*T;E[y].setAttribute("y",_.t+T-q),E[y].setAttribute("height",q)})}}function Ht(t,{ds:e,mu:n,se:s,observed:a,test:o,tails:i}){let m=s>0?s:1e-9,d=o?o.se:0,h=Math.min(n-4*m,a,o?-4*d:1/0),l=Math.max(n+4*m,a,o?4*d:-1/0),p=.03*(l-h||1),x=h-p,f=l+p,b=(f-x)/50,$=A=>x+A*b,g=new Array(50).fill(0);for(let A of e){let C=Math.floor((A-x)/b);C>=0&&C<50&&g[C]++}let E=g.map(A=>A/e.length),v=E.map((A,C)=>X(($(C+1)-n)/m)-X(($(C)-n)/m)),w=o?E.map((A,C)=>o.cdf($(C+1)/d)-o.cdf($(C)/d)):[],y=ot(D([...E,...v,...w])),q=at(t,y),N=A=>_.l+(A-x)/(f-x)*I,O=I/50,lt=A=>_.l+(A+.5)*O,F=_.t+T;if(o){let A=o.crit*d,C=i==="two"?[[x,-A],[A,f]]:[[A,f]];for(let[dt,nt]of C){let mt=N(Math.max(dt,x)),Bt=N(Math.min(nt,f));Bt>mt&&B("rect",{x:mt,y:_.t,width:Bt-mt,height:T,class:"reject"},t)}}E.forEach((A,C)=>B("rect",{x:_.l+C*O+.5,width:O-1,y:q(A),height:T-(q(A)-_.t),class:"bar d"},t));let et=(A,C)=>B("path",{d:A.map((dt,nt)=>`${nt?"L":"M"}${lt(nt)},${q(dt)}`).join(" "),class:C},t);s>0&&et(v,"curve"),o&&et(w,"curve null"),B("line",{x1:_.l,x2:K-_.r,y1:F,y2:F,class:"axis"},t);for(let A=0;A<=4;A++)B("text",{x:_.l+A*I/4,y:F+15,class:"tick","text-anchor":"middle"},t,z(x+A*(f-x)/4));if(B("text",{x:_.l-6,y:F+15,class:"axis-title","text-anchor":"end"},t,"\u0394"),o){for(let A=-4;A<=4;A++){let C=A*d;C>=x&&C<=f&&B("text",{x:N(C),y:F+32,class:"tick","text-anchor":"middle"},t,A)}B("text",{x:_.l-6,y:F+32,class:"axis-title","text-anchor":"end"},t,o.sym)}let R=N(a);B("line",{x1:R,x2:R,y1:_.t,y2:F,class:"obs"},t);let Zt=`\u03B4 = ${z(a)}`+(o?`, ${o.sym} = ${z(o.stat)}`:""),gt=R>_.l+I*.6;B("text",{x:R+(gt?-5:5),y:_.t+11,class:"obs-label","text-anchor":gt?"end":"start"},t,Zt)}function Lt(t,{sym:e,stat:n,pdf:s,crit:a,tails:o,ci:i,level:c}){let m=[Math.abs(n),...i?[i.lo,i.hi].filter(isFinite).map(Math.abs):[]],d=Math.max(4.5,Math.ceil(D(m)+.5)),h=-d,l=d,p=ot(s(0)),x=at(t,p,"density"),f=y=>_.l+(y-h)/(l-h)*I,b=_.t+T,$=(y,q,N)=>{if(y=Math.max(y,h),q=Math.min(q,l),q<=y)return;let O=Math.max(2,Math.ceil((q-y)*40)),lt=Array.from({length:O+1},(F,et)=>{let R=y+(q-y)*et/O;return`L${f(R)},${x(s(R))}`});B("path",{d:`M${f(y)},${x(0)} ${lt.join(" ")} L${f(q)},${x(0)} Z`,class:N},t)},g=o==="two";g&&$(h,-a,"reject-area"),$(a,l,"reject-area"),o==="two"?($(h,-Math.abs(n),"pval-area"),$(Math.abs(n),l,"pval-area")):$(n,l,"pval-area");let E=Array.from({length:241},(y,q)=>{let N=h+(l-h)*q/240;return`${q?"L":"M"}${f(N)},${x(s(N))}`});B("path",{d:E.join(" "),class:"curve"},t),B("line",{x1:_.l,x2:K-_.r,y1:b,y2:b,class:"axis"},t);for(let y=Math.ceil(h);y<=l;y++)B("text",{x:f(y),y:b+16,class:"tick","text-anchor":"middle"},t,y);B("text",{x:_.l+I/2,y:tt-6,class:"axis-title","text-anchor":"middle"},t,e);for(let y of g?[-a,a]:[a])B("line",{x1:f(y),x2:f(y),y1:x(s(y)),y2:b,class:"crit"},t);if(i){let y=x(p*.1),q=f(Math.max(i.lo,h)),N=f(Math.min(i.hi,l));B("line",{x1:q,x2:N,y1:y,y2:y,class:"ci"},t),B("line",{x1:q,x2:q,y1:y-6,y2:y+6,class:"ci"},t),isFinite(i.hi)?B("line",{x1:N,x2:N,y1:y-6,y2:y+6,class:"ci"},t):B("path",{d:`M${N},${y} L${N-8},${y-5} L${N-8},${y+5} Z`,class:"ci-arrow"},t);let O=isFinite(i.dHi)?`[${z(i.dLo)}, ${z(i.dHi)}]`:`[${z(i.dLo)}, \u221E)`;B("text",{x:(q+N)/2,y:y-10,class:"ci-label","text-anchor":"middle"},t,`${c}% CI for the difference: ${O}`)}let v=f(n);B("line",{x1:v,x2:v,y1:_.t,y2:b,class:"obs"},t);let w=v>_.l+I*.6;B("text",{x:v+(w?-5:5),y:_.t+11,class:"obs-label","text-anchor":w?"end":"start"},t,`${e} = ${z(n)}`)}var u=t=>document.getElementById(t),ee=matchMedia("(prefers-reduced-motion: reduce)").matches,M=null,zt=0,yt=0,Ot=0,rt=null,_t=null,bt=0;function ne(){u("dist").innerHTML=Object.entries(U).map(([t,e])=>`<option value="${t}">${e.name}</option>`).join("")}function Ft(){let t=U[u("dist").value];for(let e of["paramNameA","paramNameB"])u(e).textContent=t.param;u("pA").value=t.defaults[0],u("pB").value=t.defaults[1],u("paramHint").textContent=`${t.param}: ${t.paramHint}`,u("obsHint").textContent=`${t.name} data: ${t.valueHint}.`,u("obsA").value=t.exampleObs[0].join(", "),u("obsB").value=t.exampleObs[1].join(", "),u("test").innerHTML=Pt(u("dist").value).map(e=>`<option value="${e}">${J[e].name}</option>`).join("")}function se(){let t=U[u("dist").value],e=[Number(u("pA").value),Number(u("pB").value)],n=[Number(u("nA").value),Number(u("nB").value)];if(e.some(o=>!isFinite(o)||!t.valid(o)))throw new Error(`Parameter ${t.param} must be valid: ${t.paramHint}.`);if(n.some(o=>!Number.isInteger(o)||o<2||o>2e5))throw new Error("Sample sizes must be whole numbers from 2 to 200,000.");let s=u("seed").value.trim();if(s!==""&&!Number.isInteger(Number(s)))throw new Error("Seed must be a whole number (or blank for random).");let a=s===""?Math.floor(Math.random()*2**32):Number(s);return{dist:t,params:e,ns:n,seed:a}}function oe(){let t=document.querySelector('input[name="mode"]:checked').value;u("form").hidden=t!=="simulation",u("obsForm").hidden=t!=="observation",u("dataHeading").textContent=t==="simulation"?"2. Simulate":"2. Observations"}function ae(t){t.preventDefault(),u("error").textContent="";let e;try{e=se()}catch(m){u("error").textContent=m.message;return}let{dist:n,params:s,ns:a,seed:o}=e,i=[V(o),V(o^2654435769)],c=[0,1].map(m=>Array.from({length:a[m]},()=>n.sample(s[m],i[m])));M={distKey:u("dist").value,a:c[0],b:c[1],params:s,seed:o,mode:"simulation",id:++Ot},u("seedUsed").textContent=`seed ${o}`,Ut(n)}function jt(t,e,n){let s=t.split(/[\s,;]+/).filter(Boolean),a=s.map(Number),o=a.findIndex(i=>!isFinite(i)||!n.validValue(i));if(o>=0)throw new Error(`Group ${e}: "${s[o]}" is not valid. ${n.name} data: ${n.valueHint}.`);if(a.length<2)throw new Error(`Group ${e} needs at least 2 values.`);if(a.length>2e5)throw new Error(`Group ${e} has too many values (limit 200,000).`);return a}function re(t){t.preventDefault(),u("obsError").textContent="";let e=U[u("dist").value],n,s;try{n=jt(u("obsA").value,"A",e),s=jt(u("obsB").value,"B",e)}catch(a){u("obsError").textContent=a.message;return}M={distKey:u("dist").value,a:n,b:s,params:null,seed:Math.floor(Math.random()*2**32),mode:"observation",id:++Ot},Ut(e)}function ie(){let t=M.mode==="observation";for(let e of["source","dsource"])document.querySelector(`input[name="${e}"][value="true"]`).disabled=t,t&&(document.querySelector(`input[name="${e}"][value="bootstrap"]`).checked=!0)}function ce(t){["A","B"].forEach((e,n)=>{let s=u(`dataMath${e}`);s.replaceChildren();let a=M.mode==="simulation"?`${t.tex.param} = ${r(M.params[n])}`:`${t.tex.param}_${e}`;S(s,`X_${e} \\sim \\text{${t.name}}(${a})`)})}function le(t){["A","B"].forEach((e,n)=>{let s=u(`statsMath${e}`);s.replaceChildren();let a=n?M.b:M.a,o=a.length,i=P(a),c=a.reduce((h,l)=>h+(l-i)**2,0),m=c/(o-1),d=t.name==="Bernoulli"?`= \\hat p_${e} `:"";S(s,`\\bar x_${e} = \\dfrac{1}{n_${e}}\\sum_{i=1}^{n_${e}} x_i = \\dfrac{${r(L(a))}}{${o}} ${d}= ${r(i)}`),S(s,`s_${e}^2 = \\dfrac{1}{n_${e}-1}\\sum_{i=1}^{n_${e}} (x_i - \\bar x_${e})^2 = \\dfrac{${r(c)}}{${o-1}} = ${r(m)}`),S(s,`s_${e} = \\sqrt{s_${e}^2} = \\sqrt{${r(m)}} = ${r(Math.sqrt(m))}`)})}function Ut(t){u("plots").hidden=!1,u("sampling").hidden=!1,u("analysis").hidden=!1;let e=[M.a,M.b],n=Tt(t,e,M.params),s=[xt(u("plotA"),n,0,"a"),xt(u("plotB"),n,1,"b")];["A","B"].forEach((a,o)=>{let i=e[o];u(`summary${a}`).textContent=`n = ${i.length}, mean = ${+P(i).toPrecision(4)}, sd = ${+Math.sqrt(j(i)).toPrecision(4)}`+(t.name==="Bernoulli"?`, successes = ${L(i)}`:"")}),ce(t),le(t),u("plotsNote").textContent=M.mode==="simulation"?"Bars are the observed relative frequencies. The short horizontal lines mark what the true distribution predicts.":"Bars are the observed relative frequencies of your data.",ie(),Rt(s),it(!1),vt()}function Rt(t){if(cancelAnimationFrame(bt),ee)return t.forEach(a=>a(1));let e=performance.now(),n=900,s=a=>{let o=Math.min(1,(a-e)/n),i=1-(1-o)**3;t.forEach(c=>c(i)),o<1&&(bt=requestAnimationFrame(s))};bt=requestAnimationFrame(s)}function it(t){if(!M)return;let e=Number(u("sn").value),n=Number(u("sreps").value),s=u("samplingError");if(s.textContent="",!Number.isInteger(e)||e<1||e>5e3)return void(s.textContent="Sample size must be a whole number from 1 to 5,000.");if(!Number.isInteger(n)||n<100||n>1e4)return void(s.textContent="Repeats must be a whole number from 100 to 10,000.");if(e*n>5e6)return void(s.textContent="Sample size \xD7 repeats must be at most 5,000,000.");let a=U[M.distKey],o=document.querySelector('input[name="source"]:checked').value==="bootstrap",i=["A","B"].map((c,m)=>{let d=M.params?.[m],h=m?M.b:M.a,l=V(M.seed^(m?3266489909:2246822507)^zt*2654435761),p=o?()=>h[Math.floor(l()*h.length)]:()=>a.sample(d,l),x=Array.from({length:n},()=>{let E=0;for(let v=0;v<e;v++)E+=p();return E/e}),f=o?P(h):a.mean(d),b=o?j(h):a.variance(d),$=Math.sqrt(b/e),g=u(`meansMath${c}`);if(g.replaceChildren(),o)S(g,`X^*_i \\sim \\text{drawn with replacement from the observed sample } (n_${c} = ${h.length}),\\quad i = 1,\\dots,${e}`),S(g,`\\bar x_${c} = ${r(f)},\\qquad s_${c}^2 = ${r(b)}`),S(g,`\\bar X^*_${c} = \\dfrac{1}{n}\\sum_{i=1}^{n} X^*_i \\;\\approx\\; N\\!\\left(\\bar x,\\ \\dfrac{s^2}{n}\\right) = N\\!\\left(${r(f)},\\ \\dfrac{${r(b)}}{${e}}\\right) = N(${r(f)},\\ ${r($*$)}),\\quad SE = \\dfrac{s}{\\sqrt n} = ${r($)}`);else{let E=a.tex;S(g,`X_i \\sim \\text{${a.name}}(${E.param} = ${r(d)}),\\quad i = 1,\\dots,${e}`),S(g,`\\mu = ${E.mean} = ${r(f)},\\qquad \\sigma^2 = ${E.variance} = ${r(b)}`),S(g,`\\bar X_${c} = \\dfrac{1}{n}\\sum_{i=1}^{n} X_i \\;\\approx\\; N\\!\\left(\\mu,\\ \\dfrac{\\sigma^2}{n}\\right) = N\\!\\left(${r(f)},\\ \\dfrac{${r(b)}}{${e}}\\right) = N(${r(f)},\\ ${r($*$)}),\\quad SE = \\dfrac{\\sigma}{\\sqrt n} = ${r($)}`)}return u(`meansSummary${c}`).textContent=`mean of sample means = ${+P(x).toPrecision(4)} (${o?"observed sample mean":"true mean"} ${+f.toPrecision(4)}), sd of sample means = ${+Math.sqrt(j(x)).toPrecision(4)} (theory ${o?"s":"\u03C3"}/\u221An = ${+$.toPrecision(4)})`,It(u(`meansPlot${c}`),{means:x,mu:f,se:$,observed:P(m?M.b:M.a)},c.toLowerCase())});t?Rt(i):i.forEach(c=>c(1))}function de(t,e,n){let s=u("statPlot"),a=u("statMath");a.replaceChildren();let o=t.statDist;if(!o){s.replaceChildren(),u("statSummary").textContent="No test statistic is available for this test on these samples.";return}let i=+((1-e)*100).toFixed(4);Lt(s,{sym:o.sym,stat:o.stat,pdf:o.pdf,crit:o.crit,tails:n,ci:o.ci,level:i}),S(a,`\\text{Under } H_0:\\ ${o.sym} \\sim ${o.ref},\\qquad ${o.sym}_{obs} = ${r(o.stat)}`),S(a,n==="two"?`p = 2\\,P(${o.sym==="z"?"Z":"T"} \\ge |${o.sym}_{obs}|) = ${r(t.p)}`:`p = P(${o.sym==="z"?"Z":"T"} \\ge ${o.sym}_{obs}) = ${r(t.p)}`);let c=o.ci,m="";if(c){let d=isFinite(c.dHi)?"]":")";S(a,`${i}\\%\\ \\text{CI for the difference}:\\ [${r(c.dLo)},\\ ${r(c.dHi)}${d}\\quad\\Longrightarrow\\quad \\text{in } ${o.sym} \\text{ units: } [${r(c.lo)},\\ ${r(c.hi)}${d}`);let h=c.dLo<=0&&c.dHi>=0;m=` The thick bar is the ${i}% confidence interval for the difference \u03BC_B \u2212 \u03BC_A, drawn here by dividing its ends by the SE, so it is centred on the observed ${o.sym}. It ${h?"contains":"excludes"} 0, which matches ${h===!t.reject?"the test decision":"the p-value only approximately (the proportions z-test uses a different SE for its interval)"}.`}u("statSummary").textContent=`The purple area is the p-value: how likely a statistic at least this extreme is if H\u2080 is true. The red area is the rejection region, with total area \u03B1 = ${e}; its boundary is the critical value ${n==="two"?"\xB1":""}${+o.crit.toPrecision(4)}. `+(t.reject?`The observed ${o.sym} lands in the rejection region (p \u2264 \u03B1), so we reject H\u2080.`:`The observed ${o.sym} is outside the rejection region (p > \u03B1), so we fail to reject H\u2080.`)+m}function me(t,e){let n=[M.id,M.seed,t,e,yt].join("|");if(rt?.key===n)return rt;let s=U[M.distKey],a=t==="bootstrap",o=V(M.seed^668265263^yt*2654435761),i=l=>{let p=l?M.b:M.a,x=M.params?.[l],f=p.length;return{n:f,draw:a?()=>p[Math.floor(o()*f)]:()=>s.sample(x,o),mu:a?P(p):s.mean(x),v:a?j(p):s.variance(x)}},[c,m]=[i(0),i(1)],d=l=>{let p=0;for(let x=0;x<l.n;x++)p+=l.draw();return p/l.n},h=Array.from({length:e},()=>{let l=d(c);return d(m)-l});return rt={key:n,ds:h,boot:a,mu:m.mu-c.mu,se:Math.sqrt(c.v/c.n+m.v/m.n),vA:c.v,vB:m.v,observed:P(M.b)-P(M.a)},rt}function ct(){if(!M||!_t)return;let t=u("diffError");t.textContent="";let e=Number(u("dreps").value);if(!Number.isInteger(e)||e<100||e>1e4)return void(t.textContent="Repeats must be a whole number from 100 to 10,000.");if((M.a.length+M.b.length)*e>2e7)return void(t.textContent="Too many draws: (n_A + n_B) \xD7 repeats must be at most 20,000,000.");let n=document.querySelector('input[name="dsource"]:checked').value,s=me(n,e),a=document.querySelector('input[name="tails"]:checked').value,o=_t.diff;Ht(u("diffPlot"),{ds:s.ds,mu:s.mu,se:s.se,observed:s.observed,test:o,tails:a});let i=M.a.length,c=M.b.length,m=u("diffMath");m.replaceChildren();let[d,h,l]=s.boot?["\\bar x_B - \\bar x_A","s_A^2","s_B^2"]:["\\mu_B - \\mu_A","\\sigma_A^2","\\sigma_B^2"];S(m,`\\Delta = \\bar X_B - \\bar X_A \\;\\approx\\; N\\!\\left(${d},\\ \\dfrac{${h}}{n_A} + \\dfrac{${l}}{n_B}\\right) = N\\!\\left(${r(s.mu)},\\ \\dfrac{${r(s.vA)}}{${i}} + \\dfrac{${r(s.vB)}}{${c}}\\right) = N(${r(s.mu)},\\ ${r(s.se**2)})`);let p=`mean of simulated \u0394 = ${+P(s.ds).toPrecision(4)}, sd = ${+Math.sqrt(j(s.ds)).toPrecision(4)} (theory ${+s.se.toPrecision(4)}).`;if(o){let x=o.crit*o.se,f=s.ds.filter($=>a==="two"?Math.abs($)>=x:$>=x).length/s.ds.length,b=o.sym;S(m,`\\text{Under } H_0:\\ \\dfrac{\\Delta}{SE} \\sim ${o.ref},\\qquad SE = ${r(o.se)}`),S(m,`${b}_{obs} = \\dfrac{\\delta}{SE} = \\dfrac{${r(o.d)}}{${r(o.se)}} = ${r(o.stat)}`),S(m,a==="two"?`\\text{Reject } H_0 \\text{ if } |${b}| \\ge ${r(o.crit)}\\ \\ (\\text{i.e. } |\\delta| \\ge ${r(x)})`:`\\text{Reject } H_0 \\text{ if } ${b} \\ge ${r(o.crit)}\\ \\ (\\text{i.e. } \\delta \\ge ${r(x)})`),p+=` ${+(f*100).toFixed(1)}% of the simulated \u0394 values land in the rejection region`+(s.boot?".":", which approximates the power of this test at these sample sizes (a Type I error rate if the true groups are equal).")}else p+=" This test does not use d, so there is no null curve or test statistic to draw.";u("diffSummary").textContent=p}function S(t,e){let n=document.createElement("div");n.className="tex",window.katex?window.katex.render(e,n,{displayMode:!0,throwOnError:!1}):n.textContent=e,t.appendChild(n)}function G(t,e,n,s){let a=document.createElement(t);return e&&(a.className=e),n!==void 0&&(a.textContent=n),s&&s.appendChild(a),a}function ue(){let t=u("deltaMath");t.replaceChildren();let[e,n]=[P(M.a),P(M.b)];S(t,"\\Delta = \\bar X_B - \\bar X_A"),S(t,`\\delta = \\bar x_B - \\bar x_A = ${r(n)} - ${r(e)} = ${r(n-e)}`)}function vt(){if(!M)return;let t=Number(u("alpha").value);if(u("alphaError").textContent="",!(t>0&&t<1)){u("alphaError").textContent="\u03B1 must be between 0 and 1.";return}let e=document.querySelector('input[name="tails"]:checked').value;ue();let n=J[u("test").value].run(M.a,M.b,{alpha:t,tails:e});_t=n,de(n,t,e);let s=u("hyp");s.replaceChildren(),S(s,`H_0:\\ ${n.hypotheses.h0}`),S(s,`H_1:\\ ${n.hypotheses.h1}`);let a=u("steps");a.replaceChildren(),n.steps.forEach((m,d)=>{let h=G("div","step",void 0,a);G("h4","",`${d+1}. ${m.title}`,h),m.lines.forEach(l=>S(h,l)),m.note&&G("p","note",m.note,h)});let o=U[M.distKey],i=kt(n,{alpha:t,tails:e,trueMeanA:M.params&&o.mean(M.params[0]),trueMeanB:M.params&&o.mean(M.params[1])}),c=u("concl");c.replaceChildren(),G("p","headline",i.headline,c),G("p","",i.detail,c),i.truth&&G("p","note",i.truth,c),ct()}ne();Ft();u("dist").addEventListener("change",Ft);u("form").addEventListener("submit",ae);u("obsForm").addEventListener("submit",re);document.querySelectorAll('input[name="mode"]').forEach(t=>t.addEventListener("change",oe));for(let t of["test","alpha"])u(t).addEventListener("input",vt);var Dt=(t,e)=>{let n;return()=>{clearTimeout(n),n=setTimeout(t,e)}},Mt=Dt(()=>it(!1),200);u("sn").addEventListener("input",()=>{u("snRange").value=u("sn").value,Mt()});u("snRange").addEventListener("input",()=>{u("sn").value=u("snRange").value,Mt()});u("sreps").addEventListener("input",Mt);u("dreps").addEventListener("input",Dt(ct,200));document.querySelectorAll('input[name="dsource"]').forEach(t=>t.addEventListener("change",ct));u("dresample").addEventListener("click",()=>{yt++,ct()});document.querySelectorAll('input[name="source"]').forEach(t=>t.addEventListener("change",()=>it(!1)));u("resample").addEventListener("click",()=>{zt++,it(!0)});document.querySelectorAll('input[name="tails"]').forEach(t=>t.addEventListener("change",vt));})();
+</script>
+</head>
+<body>
+  <main>
+    <h1>A/B Test Simulator</h1>
+    <p class="lede">Simulate two groups from a known distribution, or enter your own observations, then run a hypothesis test on them and see every step of the math.</p>
+
+    <h2>1. Underlying distribution</h2>
+    <p>Both groups are drawn from a <select id="dist"></select> distribution.</p>
+    <p>The data comes from:
+      <label><input type="radio" name="mode" value="simulation" checked> simulation</label>
+      <label><input type="radio" name="mode" value="observation"> observation</label>
+    </p>
+
+    <h2 id="dataHeading">2. Simulate</h2>
+    <form id="form">
+      <p>Group A: <span id="paramNameA"></span> = <input id="pA" size="6" inputmode="decimal">, n<sub>A</sub> = <input id="nA" size="6" value="200" inputmode="numeric"></p>
+      <p>Group B: <span id="paramNameB"></span> = <input id="pB" size="6" inputmode="decimal">, n<sub>B</sub> = <input id="nB" size="6" value="200" inputmode="numeric"></p>
+      <p class="note" id="paramHint"></p>
+      <p>Random seed (optional): <input id="seed" size="10" inputmode="numeric" placeholder="random"></p>
+      <p><button type="submit">Generate samples</button> <span class="note" id="seedUsed"></span></p>
+      <p class="error" id="error" role="alert"></p>
+    </form>
+    <form id="obsForm" hidden>
+      <p class="note">Enter each group's observed values, separated by commas, spaces or new lines. <span id="obsHint"></span></p>
+      <p><label for="obsA">Group A</label><textarea id="obsA" rows="3"></textarea></p>
+      <p><label for="obsB">Group B</label><textarea id="obsB" rows="3"></textarea></p>
+      <p><button type="submit">Use these observations</button></p>
+      <p class="error" id="obsError" role="alert"></p>
+    </form>
+
+    <section id="plots" hidden>
+      <figure>
+        <figcaption><span class="swatch a"></span> Group A</figcaption>
+        <div id="dataMathA"></div>
+        <svg id="plotA" role="img" aria-label="Histogram of group A"></svg>
+        <p class="note" id="summaryA"></p>
+        <div id="statsMathA"></div>
+      </figure>
+      <figure>
+        <figcaption><span class="swatch b"></span> Group B</figcaption>
+        <div id="dataMathB"></div>
+        <svg id="plotB" role="img" aria-label="Histogram of group B"></svg>
+        <p class="note" id="summaryB"></p>
+        <div id="statsMathB"></div>
+      </figure>
+      <p class="note" id="plotsNote"></p>
+    </section>
+
+    <section id="sampling" hidden>
+      <h2>3. Sampling distribution of the mean</h2>
+      <p>Draw from:
+        <label><input type="radio" name="source" value="true" checked> the true distribution</label>
+        <label><input type="radio" name="source" value="bootstrap"> a bootstrap of my samples</label>
+      </p>
+      <p>Draw samples of size <input id="sn" size="5" value="30" inputmode="numeric"> <input id="snRange" type="range" min="1" max="500" value="30" aria-label="Sample size">
+        from each group, <input id="sreps" size="6" value="2000" inputmode="numeric"> times, and plot the mean of each sample. <button type="button" id="resample">Resample</button></p>
+      <p class="error" id="samplingError" role="alert"></p>
+      <figure>
+        <figcaption><span class="swatch a"></span> Group A</figcaption>
+        <div id="meansMathA"></div>
+        <svg id="meansPlotA" role="img" aria-label="Sampling distribution of the mean, group A"></svg>
+        <p class="note" id="meansSummaryA"></p>
+      </figure>
+      <figure>
+        <figcaption><span class="swatch b"></span> Group B</figcaption>
+        <div id="meansMathB"></div>
+        <svg id="meansPlotB" role="img" aria-label="Sampling distribution of the mean, group B"></svg>
+        <p class="note" id="meansSummaryB"></p>
+      </figure>
+      <p class="note">The solid curve is the central limit theorem's normal approximation: N(μ, σ²/n) using the true values, or N(x̄, s²/n) using your sample's values when bootstrapping. The dashed line is the mean of your sample above. Try n = 1 and then slide it up.</p>
+    </section>
+
+    <section id="analysis" hidden>
+      <h2>4. Analyse</h2>
+      <p>Test: <select id="test"></select></p>
+      <p>Significance level α = <input id="alpha" size="5" value="0.05" inputmode="decimal"> <span class="error" id="alphaError"></span></p>
+      <p>Alternative:
+        <label><input type="radio" name="tails" value="two" checked> two-sided (A ≠ B)</label>
+        <label><input type="radio" name="tails" value="greater"> one-sided (B &gt; A)</label>
+      </p>
+
+      <h3>Difference in means</h3>
+      <p class="note">The tests below are built around Δ, the difference between the two sample means. Samples are random, so Δ is random too: its distribution over repeated experiments is the <b>sampling distribution of the difference in means</b>, drawn further down. Lowercase δ is the single value your data produced.</p>
+      <div id="deltaMath"></div>
+
+      <h3>Hypotheses</h3>
+      <div id="hyp"></div>
+
+      <h3>Step by step</h3>
+      <div id="steps"></div>
+
+      <h3>Test statistic and p-value</h3>
+      <div id="statMath"></div>
+      <svg id="statPlot" role="img" aria-label="Null distribution of the test statistic with the observed value, p-value area and rejection region"></svg>
+      <p class="legend note">
+        <span class="key line"></span> null distribution of the statistic
+        <span class="key obs"></span> your observed statistic
+        <span class="key pval"></span> p-value
+        <span class="key reject"></span> rejection region
+        <span class="key crit"></span> critical value
+        <span class="key ci"></span> confidence interval for the difference
+      </p>
+      <p class="note" id="statSummary"></p>
+
+      <h3>Sampling distribution of the difference in means (Δ)</h3>
+      <p class="note">This shows the same test on the original scale of Δ = X̄_B − X̄_A. The <b>bars and solid curve</b> are what Δ actually does when you repeat the experiment, so they sit around the true effect. The <b>dashed curve</b> is what Δ would do if H₀ were true, so it sits around 0. The further apart they are, the more power the test has. The second axis converts Δ into the test statistic.</p>
+      <p>Draw from:
+        <label><input type="radio" name="dsource" value="true" checked> the true distribution</label>
+        <label><input type="radio" name="dsource" value="bootstrap"> a bootstrap of my samples</label><br>
+        Repeat the whole experiment (n<sub>A</sub>, n<sub>B</sub> as above) <input id="dreps" size="6" value="2000" inputmode="numeric"> times.
+        <button type="button" id="dresample">Resample</button></p>
+      <p class="error" id="diffError" role="alert"></p>
+      <div id="diffMath"></div>
+      <svg id="diffPlot" role="img" aria-label="Sampling distribution of the difference in means, with the null distribution and rejection region"></svg>
+      <p class="legend note" id="diffLegend">
+        <span class="key hist"></span> simulated Δ
+        <span class="key line"></span> sampling distribution of Δ
+        <span class="key dashed"></span> null distribution (what the test assumes)
+        <span class="key reject"></span> rejection region
+        <span class="key obs"></span> your observed δ
+      </p>
+      <p class="note" id="diffSummary"></p>
+
+      <h3>Conclusion</h3>
+      <div id="concl"></div>
+    </section>
+  </main>
+</body>
+</html>
