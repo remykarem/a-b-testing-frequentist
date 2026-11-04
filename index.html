@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>A/B Test Simulator</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+  <link rel="stylesheet" href="style.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <main>
+    <h1>A/B Test Simulator</h1>
+    <p class="lede">Simulate two groups from a known distribution, or enter your own observations, then run a hypothesis test on them and see every step of the math.</p>
+
+    <h2>1. Underlying distribution</h2>
+    <p>Both groups are drawn from a <select id="dist"></select> distribution.</p>
+    <p>The data comes from:
+      <label><input type="radio" name="mode" value="simulation" checked> simulation</label>
+      <label><input type="radio" name="mode" value="observation"> observation</label>
+    </p>
+
+    <h2 id="dataHeading">2. Simulate</h2>
+    <form id="form">
+      <p>Group A: <span id="paramNameA"></span> = <input id="pA" size="6" inputmode="decimal">, n<sub>A</sub> = <input id="nA" size="6" value="200" inputmode="numeric"></p>
+      <p>Group B: <span id="paramNameB"></span> = <input id="pB" size="6" inputmode="decimal">, n<sub>B</sub> = <input id="nB" size="6" value="200" inputmode="numeric"></p>
+      <p class="note" id="paramHint"></p>
+      <p>Random seed (optional): <input id="seed" size="10" inputmode="numeric" placeholder="random"></p>
+      <p><button type="submit">Generate samples</button> <span class="note" id="seedUsed"></span></p>
+      <p class="error" id="error" role="alert"></p>
+    </form>
+    <form id="obsForm" hidden>
+      <p class="note">Enter each group's observed values, separated by commas, spaces or new lines. <span id="obsHint"></span></p>
+      <p><label for="obsA">Group A</label><textarea id="obsA" rows="3"></textarea></p>
+      <p><label for="obsB">Group B</label><textarea id="obsB" rows="3"></textarea></p>
+      <p><button type="submit">Use these observations</button></p>
+      <p class="error" id="obsError" role="alert"></p>
+    </form>
+
+    <section id="plots" hidden>
+      <figure>
+        <figcaption><span class="swatch a"></span> Group A</figcaption>
+        <div id="dataMathA"></div>
+        <svg id="plotA" role="img" aria-label="Histogram of group A"></svg>
+        <p class="note" id="summaryA"></p>
+        <div id="statsMathA"></div>
+      </figure>
+      <figure>
+        <figcaption><span class="swatch b"></span> Group B</figcaption>
+        <div id="dataMathB"></div>
+        <svg id="plotB" role="img" aria-label="Histogram of group B"></svg>
+        <p class="note" id="summaryB"></p>
+        <div id="statsMathB"></div>
+      </figure>
+      <p class="note" id="plotsNote"></p>
+    </section>
+
+    <section id="sampling" hidden>
+      <h2>3. Sampling distribution of the mean</h2>
+      <p>Draw from:
+        <label><input type="radio" name="source" value="true" checked> the true distribution</label>
+        <label><input type="radio" name="source" value="bootstrap"> a bootstrap of my samples</label>
+      </p>
+      <p>Draw samples of size <input id="sn" size="5" value="30" inputmode="numeric"> <input id="snRange" type="range" min="1" max="500" value="30" aria-label="Sample size">
+        from each group, <input id="sreps" size="6" value="2000" inputmode="numeric"> times, and plot the mean of each sample. <button type="button" id="resample">Resample</button></p>
+      <p class="error" id="samplingError" role="alert"></p>
+      <figure>
+        <figcaption><span class="swatch a"></span> Group A</figcaption>
+        <div id="meansMathA"></div>
+        <svg id="meansPlotA" role="img" aria-label="Sampling distribution of the mean, group A"></svg>
+        <p class="note" id="meansSummaryA"></p>
+      </figure>
+      <figure>
+        <figcaption><span class="swatch b"></span> Group B</figcaption>
+        <div id="meansMathB"></div>
+        <svg id="meansPlotB" role="img" aria-label="Sampling distribution of the mean, group B"></svg>
+        <p class="note" id="meansSummaryB"></p>
+      </figure>
+      <p class="note">The solid curve is the central limit theorem's normal approximation: N(μ, σ²/n) using the true values, or N(x̄, s²/n) using your sample's values when bootstrapping. The dashed line is the mean of your sample above. Try n = 1 and then slide it up.</p>
+    </section>
+
+    <section id="analysis" hidden>
+      <h2>4. Analyse</h2>
+      <p>Test: <select id="test"></select></p>
+      <p>Significance level α = <input id="alpha" size="5" value="0.05" inputmode="decimal"> <span class="error" id="alphaError"></span></p>
+      <p>Alternative:
+        <label><input type="radio" name="tails" value="two" checked> two-sided (A ≠ B)</label>
+        <label><input type="radio" name="tails" value="greater"> one-sided (B &gt; A)</label>
+      </p>
+
+      <h3>Difference in means</h3>
+      <p class="note">The tests below are built around Δ, the difference between the two sample means. Samples are random, so Δ is random too: its distribution over repeated experiments is the <b>sampling distribution of the difference in means</b>, drawn further down. Lowercase δ is the single value your data produced.</p>
+      <div id="deltaMath"></div>
+
+      <h3>Hypotheses</h3>
+      <div id="hyp"></div>
+
+      <h3>Step by step</h3>
+      <div id="steps"></div>
+
+      <h3>Test statistic and p-value</h3>
+      <div id="statMath"></div>
+      <svg id="statPlot" role="img" aria-label="Null distribution of the test statistic with the observed value, p-value area and rejection region"></svg>
+      <p class="legend note">
+        <span class="key line"></span> null distribution of the statistic
+        <span class="key obs"></span> your observed statistic
+        <span class="key pval"></span> p-value
+        <span class="key reject"></span> rejection region
+        <span class="key crit"></span> critical value
+        <span class="key ci"></span> confidence interval for the difference
+      </p>
+      <p class="note" id="statSummary"></p>
+
+      <h3>Sampling distribution of the difference in means (Δ)</h3>
+      <p class="note">This shows the same test on the original scale of Δ = X̄_B − X̄_A. The <b>bars and solid curve</b> are what Δ actually does when you repeat the experiment, so they sit around the true effect. The <b>dashed curve</b> is what Δ would do if H₀ were true, so it sits around 0. The further apart they are, the more power the test has. The second axis converts Δ into the test statistic.</p>
+      <p>Draw from:
+        <label><input type="radio" name="dsource" value="true" checked> the true distribution</label>
+        <label><input type="radio" name="dsource" value="bootstrap"> a bootstrap of my samples</label><br>
+        Repeat the whole experiment (n<sub>A</sub>, n<sub>B</sub> as above) <input id="dreps" size="6" value="2000" inputmode="numeric"> times.
+        <button type="button" id="dresample">Resample</button></p>
+      <p class="error" id="diffError" role="alert"></p>
+      <div id="diffMath"></div>
+      <svg id="diffPlot" role="img" aria-label="Sampling distribution of the difference in means, with the null distribution and rejection region"></svg>
+      <p class="legend note" id="diffLegend">
+        <span class="key hist"></span> simulated Δ
+        <span class="key line"></span> sampling distribution of Δ
+        <span class="key dashed"></span> null distribution (what the test assumes)
+        <span class="key reject"></span> rejection region
+        <span class="key obs"></span> your observed δ
+      </p>
+      <p class="note" id="diffSummary"></p>
+
+      <h3>Conclusion</h3>
+      <div id="concl"></div>
+    </section>
+  </main>
+</body>
+</html>
